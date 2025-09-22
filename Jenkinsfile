@@ -44,6 +44,7 @@ pipeline {
                         gitleaks detect --source=./docs --report-format=table --report-path=gitleaks-docs.txt --exit-code 1
                     '''
                 }
+                sh 'ls -l gitleaks-*.txt || echo "No gitleaks report found"'
                 archiveArtifacts artifacts: 'gitleaks-*.txt', onlyIfSuccessful: false
             }
         }
@@ -51,6 +52,29 @@ pipeline {
         stage('Trivy FS Scan') {
             steps {
                 sh 'trivy fs --format table -o fs-report.html .'
+                sh 'ls -l fs-report.html || echo "No Trivy report found"'
+                archiveArtifacts artifacts: 'fs-report.html', onlyIfSuccessful: false
+            }
+        }
+
+        stage('Download SonarQube Report') {
+            steps {
+                sh '''
+                    curl -u $SONAR_TOKEN: "$SONAR_HOST_URL/api/issues/search?componentKeys=python-mini-projects&pageSize=500" -o sonar-issues.json
+                '''
+                sh 'ls -l sonar-issues.json || echo "No SonarQube report found"'
+                archiveArtifacts artifacts: 'sonar-issues.json', onlyIfSuccessful: false
+            }
+        }
+
+        stage('Email SonarQube Report') {
+            steps {
+                emailext (
+                    subject: "SonarQube Report for Python Mini Projects",
+                    body: "Hi Team,\n\nPlease find attached the latest SonarQube issues report.\n\nRegards,\nJenkins",
+                    to: 'nousath1609@gmail.com',
+                    attachmentsPattern: 'sonar-issues.json'
+                )
             }
         }
     }
