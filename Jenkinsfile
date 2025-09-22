@@ -1,4 +1,4 @@
-pipeline { 
+pipeline {
     agent any
 
     environment {
@@ -39,9 +39,12 @@ pipeline {
         stage('Git Leaks') {
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                    sh 'gitleaks detect --source=./projects --exit-code 1'
-                    sh 'gitleaks detect --source=./docs --exit-code 1'
+                    sh '''
+                        gitleaks detect --source=./projects --report-format=table --report-path=gitleaks-projects.txt --exit-code 1
+                        gitleaks detect --source=./docs --report-format=table --report-path=gitleaks-docs.txt --exit-code 1
+                    '''
                 }
+                archiveArtifacts artifacts: 'gitleaks-*.txt', onlyIfSuccessful: false
             }
         }
 
