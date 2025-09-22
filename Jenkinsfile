@@ -1,22 +1,19 @@
 pipeline {
-    agent any  // Runs on any available Jenkins node
+    agent any
 
     environment {
-        // Jenkins credential ID storing your Sonar token
         SONAR_TOKEN = credentials('SONAR_TOKEN_ID')
     }
 
     stages {
-        stage('Checkout') {
+        stage('Git Checkout') {
             steps {
-                // Checkout your GitHub repo containing all projects
                 git url: 'https://github.com/Hussainsmokie/python.git', branch: 'main'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                // Use the SonarQube server configured in Jenkins ("sonar" must match your config name)
                 withSonarQubeEnv('sonar') {
                     sh '''
                         /opt/sonar-scanner/bin/sonar-scanner \
@@ -33,10 +30,24 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                // Wait for SonarQube Quality Gate and fail pipeline if not passed
                 timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
+            }
+        }
+
+        stage('Git Leaks') {
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    sh 'gitleaks detect --source=./projects --exit-code 1'
+                    sh 'gitleaks detect --source=./docs --exit-code 1'
+                }
+            }
+        }
+
+        stage('Trivy FS Scan') {
+            steps {
+                sh 'trivy fs --format table -o fs-report.html .'
             }
         }
     }
